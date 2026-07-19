@@ -207,4 +207,129 @@ class rhythmGame_all_test extends rhythmGame_base_test;
 endclass  //component
 
 
+// =========================================================================
+// 5. [랜덤 검증 테스트]
+// =========================================================================
+class rhythmGame_random_test extends rhythmGame_base_test;
+    `uvm_component_utils(rhythmGame_random_test)
+
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    virtual task run_phase(uvm_phase phase);
+        Random_seq seq;
+
+        phase.raise_objection(this);
+        `uvm_info(get_type_name(), "Random 테스트 시작", UVM_LOW)
+
+        repeat (40) begin
+            seq = Random_seq::type_id::create("seq");   // 매번 새로 생성
+            if (!seq.randomize())
+                `uvm_fatal(get_type_name(), "randomize 실패!")
+            seq.start(env.agt.sqr);
+        end
+
+        `uvm_info(get_type_name(), "Random 테스트 종료", UVM_LOW)
+        phase.drop_objection(this);
+    endtask
+endclass
+
+// =========================================================================
+// 6. [콤보 보너스 증거 수집 테스트]
+// =========================================================================
+class rhythmGame_combobonus_test extends rhythmGame_base_test;
+    `uvm_component_utils(rhythmGame_combobonus_test)
+
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    virtual task run_phase(uvm_phase phase);
+        ComboBonus_seq seq;
+        seq = ComboBonus_seq::type_id::create("seq");
+
+        phase.raise_objection(this);
+        seq.start(env.agt.sqr);
+        phase.drop_objection(this);
+    endtask
+endclass
+
+// =========================================================================
+// [커버리지 클로저] cross 20개 bin 전수 실행
+// =========================================================================
+class rhythmGame_closure_test extends rhythmGame_base_test;
+    `uvm_component_utils(rhythmGame_closure_test)
+
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    virtual task run_phase(uvm_phase phase);
+        Random_seq seq;
+        bit [3:0] L[4]  = '{4'b0001, 4'b0010, 4'b0100, 4'b1000};
+        int       lo[3] = '{193, 203, 233};   // Good / Perfect / Miss 구간 시작
+        int       hi[3] = '{202, 222, 236};   // 각 구간 끝
+
+        phase.raise_objection(this);
+
+        // (1) 노트 레인 4 x 입력 레인 4 x 타이밍 구간 3 = 48조합
+        foreach (L[i]) foreach (L[j]) foreach (lo[k]) begin
+            seq = Random_seq::type_id::create("seq");
+            seq.c_wrong.constraint_mode(0);
+            if (!seq.randomize() with {
+                    lane       == L[i];
+                    press_lane == L[j];
+                    do_press   == 1;
+                    wait_cnt inside {[lo[k] : hi[k]]};
+                })
+                `uvm_fatal(get_type_name(), "randomize 실패")
+            seq.start(env.agt.sqr);
+        end
+
+        // (2) 미입력 4조합  ← 기존 그대로
+        foreach (L[i]) begin
+            seq = Random_seq::type_id::create("seq");
+            seq.c_wrong.constraint_mode(0);
+            if (!seq.randomize() with {
+                    lane     == L[i];
+                    do_press == 0;
+                })
+                `uvm_fatal(get_type_name(), "randomize 실패")
+            seq.start(env.agt.sqr);
+        end
+
+        phase.drop_objection(this);
+    endtask
+endclass
+
+// =========================================================================
+// [1단계 재현] 입력 레인을 노트 레인에 고정 — 오타가 발생할 수 없는 자극
+// =========================================================================
+class rhythmGame_random_stage1_test extends rhythmGame_base_test;
+    `uvm_component_utils(rhythmGame_random_stage1_test)
+
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    virtual task run_phase(uvm_phase phase);
+        Random_seq seq;
+
+        phase.raise_objection(this);
+
+        repeat (40) begin
+            seq = Random_seq::type_id::create("seq");
+            seq.c_wrong.constraint_mode(0);          // 오타 확률 제약 해제
+            if (!seq.randomize() with {
+                    press_lane == lane;              // 항상 정타 = 1단계 조건
+                })
+                `uvm_fatal(get_type_name(), "randomize 실패")
+            seq.start(env.agt.sqr);
+        end
+
+        phase.drop_objection(this);
+    endtask
+endclass
+
 `endif

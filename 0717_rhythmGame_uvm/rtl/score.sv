@@ -36,6 +36,7 @@ module score (
     logic [22:0] combo_score;
 
     assign score = basic_score + combo_score;
+     assign combo_reg = combo_data * (combo_data + 1);
 
     // logic [2:0] hit; // {perfect, good, miss} 각 hit 상태에 맞는 reg만 활성화 되는 one-hot 변수
 
@@ -50,13 +51,14 @@ module score (
     always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
             state       <= IDLE;
-            basic_score <= 32'b0;
-            combo_score <= 32'b0;
+            basic_score <= 23'b0;
+            combo_score <= 23'b0;
+            // combo_reg   <= 23'b0;
         end else begin
             case (state)
                 IDLE: begin
-                    basic_score <= 32'b0;
-                    combo_score <= 32'b0;
+                    basic_score <= 23'b0;
+                    combo_score <= 23'b0;
                     // main controller state가 GAME_CONT로 들어가면 GAME state로 이동
                     if (main_state == 3'b011) begin
                         state <= GAME;
@@ -75,17 +77,27 @@ module score (
                             basic_score <= (fever ? basic_score + 100 : basic_score + 50);    //good 기본 점수 50점, fever 상태인 경우 100점
                         end
 
-                        if (combo_done) begin
-                            combo_reg <= combo_data * (combo_data + 1);
+                        // if (combo_done) begin
+                        //     combo_reg <= combo_data * (combo_data + 1);
 
-                            if (combo_reg) begin
-                                if (combo_reg <= 16'd101) begin
+                        //     if (combo_reg) begin
+                        //         if (combo_reg <= 16'd101) begin
+                        //             combo_score <= combo_score + (combo_reg >> 1);
+                        //         end else if (combo_reg <= 16'd2550) begin
+                        //             combo_score <= combo_score + (combo_reg);
+                        //         end else begin
+                        //             combo_score <= combo_score + (combo_reg*3 >>1);
+                        //         end
+                        //     end
+                        // end
+                        if (combo_done) begin
+                            if (combo_reg != 0) begin
+                                if (combo_reg <= 23'd101)
                                     combo_score <= combo_score + (combo_reg >> 1);
-                                end else if (combo_reg <= 16'd2550) begin
-                                    combo_score <= combo_score + (combo_reg);
-                                end else begin
-                                    combo_score <= combo_score + (combo_reg*3 >>1);
-                                end
+                                else if (combo_reg <= 23'd2550)
+                                    combo_score <= combo_score + combo_reg;
+                                else
+                                    combo_score <= combo_score + ((combo_reg * 3) >> 1);
                             end
                         end
 

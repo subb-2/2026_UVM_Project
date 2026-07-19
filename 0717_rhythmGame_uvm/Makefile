@@ -1,4 +1,4 @@
-TC ?= rhythmGame_perfect_test
+TC ?= rhythmGame_random_stage1_test
 SEED ?= 1234
 
 VCS_OPTS := -full64 -sverilog
@@ -8,7 +8,7 @@ VCS_OPTS += -debug_access+all -kdb -lca
 VCS_OPTS += +incdir+./tb
 VCS_OPTS += -cm line+cond+fsm+tgl+branch+assert
 
-SIM_OPTS := +UVM_VERBOSITY=UVM_DEBUG
+SIM_OPTS := +UVM_VERBOSITY=UVM_MEDIUM
 SIM_OPTS += +ntb_random_seed=$(SEED)
 SIM_OPTS += +UVM_TESTNAME=$(TC)
 SIM_OPTS += -cm line+cond+fsm+tgl+branch+assert

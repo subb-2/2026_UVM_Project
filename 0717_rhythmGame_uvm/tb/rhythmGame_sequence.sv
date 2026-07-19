@@ -223,5 +223,223 @@ class IgnoreEarlyPress_seq extends rhythmGame_seq;
     endtask
 endclass
 
+// =========================================================================
+// 5. [랜덤 시퀀스] 레인·타이밍·오타 여부를 무작위로 뽑아 한 노트를 검증
+// =========================================================================
+class Random_seq extends rhythmGame_seq;
+    `uvm_object_utils(Random_seq)
+
+    // ---- 랜덤화 대상 ----
+    rand bit [3:0] lane;        // 노트를 뿌릴 레인 (one-hot)
+    rand bit [3:0] press_lane;  // 실제로 누를 레인 (one-hot)
+    rand int       wait_cnt;    // 몇 프레임 뒤에 누를까
+    rand bit       do_press;    // 아예 안 누르는(Miss) 경우도 섞기
+
+    // ---- 예측 결과 ----
+    string         expected;
+
+    constraint c_lane {
+        lane       inside {4'b0001, 4'b0010, 4'b0100, 4'b1000};
+        press_lane inside {4'b0001, 4'b0010, 4'b0100, 4'b1000};
+    }
+
+    // 65% 정타 / 35% 오타
+    constraint c_wrong {
+        press_lane dist {
+            lane   :/ 65,
+            [0:15] :/ 35
+        };
+    }
+
+    // 판정 시점 lcnt = 2 * wait_cnt
+    //   Good(이른)  lcnt 386~404  -> 193~202
+    //   Perfect     lcnt 406~444  -> 203~222
+    //   Good(늦은)  lcnt 446~464  -> 223~232
+    //   Miss        lcnt 466~     -> 233~
+    constraint c_wait {
+        wait_cnt inside {[193 : 236]};
+        wait_cnt dist {
+            [193 : 202] :/ 20,
+            [203 : 222] :/ 40,
+            [223 : 232] :/ 20,
+            [233 : 236] :/ 20
+        };
+    }
+
+    constraint c_press {
+        do_press dist {
+            1 :/ 90,
+            0 :/ 10
+        };
+    }
+
+    function new(string name = "Random_seq");
+        super.new(name);
+    endfunction
+
+    function void post_randomize();
+        int lcnt;
+        if (!do_press) begin
+            expected = "MISS";                  // 입력 없음
+        end else if (press_lane != lane) begin
+            expected = "MISS";                  // 오타 -> 판정 안 되고 통과
+        end else begin
+            lcnt = 2 * wait_cnt;
+            if (lcnt < 385) expected = "NONE";
+            else if (lcnt <= 404) expected = "GOOD";
+            else if (lcnt <= 445) expected = "PERFECT";
+            else if (lcnt <= 465) expected = "GOOD";
+            else expected = "MISS";
+        end
+    endfunction
+
+    virtual task body();
+        `uvm_info(get_type_name(), $sformatf(
+                  "Random_seq 시작: lane=%b press_lane=%b wait=%0d press=%0b expected=%s",
+                  lane, press_lane, wait_cnt, do_press, expected), UVM_LOW)
+
+        send_note(lane);
+        wait_frames(wait_cnt);
+
+        if (do_press) press_region(lane_to_region(press_lane));
+
+        // 정타 입력이면 판정이 바로 나오므로 짧게,
+        // 오타/미입력이면 노트가 465를 통과해 Miss가 날 때까지 대기
+        if (do_press && press_lane == lane) wait_frames(15);
+        else                                wait_frames(240 - wait_cnt);
+
+        `uvm_info(get_type_name(), "Random_seq 종료!", UVM_LOW)
+    endtask
+endclass
+
+// // =========================================================================
+// // 5. [랜덤 시퀀스] 레인과 타이밍을 무작위로 뽑아 한 노트를 검증
+// // =========================================================================
+// class Random_seq extends rhythmGame_seq;
+//     `uvm_object_utils(Random_seq)
+
+//     // ---- 랜덤화 대상 ----
+//     rand bit [3:0] lane;      // 노트를 뿌릴 레인 (one-hot)
+//     rand int       wait_cnt;  // 몇 프레임 뒤에 누를까
+//     rand bit       do_press;  // 아예 안 누르는(Miss) 경우도 섞기
+
+//     // ---- 예측 결과 (randomize 후 계산) ----
+//     string         expected;
+
+//     constraint c_lane {lane inside {4'b0001, 4'b0010, 4'b0100, 4'b1000};}
+
+//     // 판정 시점 lcnt = 2 * wait_cnt
+//     //   Good(이른)  lcnt 386~404  -> 193~202
+//     //   Perfect     lcnt 406~444  -> 203~222
+//     //   Good(늦은)  lcnt 446~464  -> 223~232
+//     //   Miss        lcnt 466~     -> 233~
+//     constraint c_wait {
+//         wait_cnt inside {[193 : 236]};
+//         wait_cnt dist {
+//             [193 : 202] :/ 20,
+//             [203 : 222] :/ 40,
+//             [223 : 232] :/ 20,
+//             [233 : 236] :/ 20
+//         };
+//     }
+
+//     constraint c_press {
+//         do_press dist {
+//             1 :/ 90,
+//             0 :/ 10
+//         };
+//     }
+
+//     function new(string name = "Random_seq");
+//         super.new(name);
+//     endfunction
+
+//     function void post_randomize();
+//         int lcnt;
+//         if (!do_press) begin
+//             expected = "MISS";
+//         end else begin
+//             lcnt = 2 * wait_cnt;          // 2*wait_cnt - 2 였던 것 수정
+//             if (lcnt < 385) expected = "NONE";
+//             else if (lcnt <= 404) expected = "GOOD";
+//             else if (lcnt <= 445) expected = "PERFECT";
+//             else if (lcnt <= 465) expected = "GOOD";
+//             else expected = "MISS";
+//         end
+//     endfunction
+
+//     virtual task body();
+//         `uvm_info(get_type_name(), $sformatf(
+//                   "Random_seq 시작: lane=%b wait=%0d press=%0b expected=%s",
+//                   lane, wait_cnt, do_press, expected), UVM_LOW)
+
+//         send_note(lane);
+//         wait_frames(wait_cnt);
+
+//         if (do_press) press_region(lane_to_region(lane));
+
+//         // 미입력 시 노트가 ZONE_MAX(465)를 통과해 Miss가 날 때까지 대기
+//         // lcnt = 2*N 이므로 233프레임이면 466 도달 -> 총 240프레임 확보
+//         if (do_press) wait_frames(15);
+//         else          wait_frames(240 - wait_cnt);
+
+//         `uvm_info(get_type_name(), "Random_seq 종료!", UVM_LOW)
+//     endtask
+// endclass
+
+// =========================================================================
+// [증거 수집용] 콤보 보너스 검증 시퀀스
+// =========================================================================
+class ComboBonus_seq extends rhythmGame_seq;
+    `uvm_object_utils(ComboBonus_seq)
+
+    function new(string name = "ComboBonus_seq");
+        super.new(name);
+    endfunction
+
+    virtual task body();
+        bit [3:0] lane = 4'b0001;
+
+        `uvm_info(get_type_name(), "=== 1단계: Perfect 10연속 ===", UVM_LOW)
+        repeat (10) begin
+            send_note(lane);
+            wait_frames(212);
+            press_region(lane_to_region(lane));
+            wait_frames(10);
+        end
+
+        `uvm_info(get_type_name(), "=== 2단계: Miss (콤보 10 끊김) ===",
+                  UVM_LOW)
+        send_note(lane);
+        wait_frames(240);
+        wait_frames(20);
+
+        `uvm_info(get_type_name(), "=== 3단계: Perfect 3연속 ===", UVM_LOW)
+        repeat (3) begin
+            send_note(lane);
+            wait_frames(212);
+            press_region(lane_to_region(lane));
+            wait_frames(10);
+        end
+
+        `uvm_info(get_type_name(), "=== 4단계: Miss (콤보 3 끊김) ===",
+                  UVM_LOW)
+        send_note(lane);
+        wait_frames(240);
+        wait_frames(20);
+
+        // [핵심] 마지막에 판정을 더 붙여 보너스 반영분을 관측
+        `uvm_info(get_type_name(),
+                  "=== 5단계: Perfect 2연속 (보너스 확인) ===",
+                  UVM_LOW)
+        repeat (2) begin
+            send_note(lane);
+            wait_frames(212);
+            press_region(lane_to_region(lane));
+            wait_frames(10);
+        end
+    endtask
+endclass
+
 
 `endif

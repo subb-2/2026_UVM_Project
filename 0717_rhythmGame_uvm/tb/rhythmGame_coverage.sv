@@ -11,11 +11,14 @@ class rhythmGame_coverage extends uvm_subscriber #(rhythmGame_seq_item);
 
     //covergroup 만들기 위해 seq_item 필요
     rhythmGame_seq_item req;
+    bit [3:0] active_lane;
+    bit [2:0] verdict_val;     // {perfect, good, miss}
 
     covergroup cg_rhythm_game;
 
         // 1. 노트 생성 레인 데이터 측정
-        cp_lane: coverpoint req.lane_data {
+        // cp_lane: coverpoint req.lane_data {
+        cp_lane: coverpoint active_lane {
             bins lane_1 = {4'b0001};
             bins lane_2 = {4'b0010};
             bins lane_3 = {4'b0100};
@@ -31,6 +34,16 @@ class rhythmGame_coverage extends uvm_subscriber #(rhythmGame_seq_item);
         }
         // 3. 교차 커버리지: 노트 위치와 손 입력 위치가 정상적으로 크로스 매치되었는가?
         cross_lane_press: cross cp_lane, cp_region;
+
+        cp_verdict: coverpoint verdict_val {
+            bins perfect = {3'b100};
+            bins good = {3'b010};
+            bins miss = {3'b001};
+            bins none = {3'b000};
+        }
+
+        cross_lane_verdict: cross cp_lane, cp_verdict;
+
     endgroup  // cg_rhythm_game
 
     function new(string name, uvm_component parent);
@@ -40,6 +53,10 @@ class rhythmGame_coverage extends uvm_subscriber #(rhythmGame_seq_item);
 
     virtual function void write(rhythmGame_seq_item t);
         req = t;
+        if (t.note_start) begin
+            active_lane = t.lane_data;
+        end
+        verdict_val = {t.perfect, t.good, t.miss};
         //sample을 하면 수집됨 
         cg_rhythm_game.sample();
     endfunction
@@ -74,6 +91,18 @@ class rhythmGame_coverage extends uvm_subscriber #(rhythmGame_seq_item);
         `uvm_info(get_type_name(), $sformatf(
                   "    Cross(lane, press)  : %.1f%%",
                   cg_rhythm_game.cross_lane_press.get_coverage()
+                  ), UVM_LOW)
+
+        // 4. 판정 결과 커버리지 출력
+        `uvm_info(get_type_name(), $sformatf(
+                  "    Verdict Cover       : %.1f%%",
+                  cg_rhythm_game.cp_verdict.get_coverage()
+                  ), UVM_LOW)
+
+        // 5. 레인별 판정 결과 교차 커버리지 출력
+        `uvm_info(get_type_name(), $sformatf(
+                  "    Cross(lane,verdict) : %.1f%%",
+                  cg_rhythm_game.cross_lane_verdict.get_coverage()
                   ), UVM_LOW)
 
         `uvm_info(get_type_name(), "===== Coverage Summary =====\n\n", UVM_LOW)

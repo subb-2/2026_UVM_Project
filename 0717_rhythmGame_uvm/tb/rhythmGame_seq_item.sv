@@ -8,20 +8,23 @@ class rhythmGame_seq_item extends uvm_sequence_item;
     // ==========================================
     // 입력 제어 신호 (Driver -> DUT)
     // ==========================================
-    rand logic [ 1:0] music_sel;
-    logic             v_sync;
-    rand logic [ 3:0] region;  // 타격 신호 (사용자 입력)
-    rand logic [ 2:0] main_state;  // 메인 제어기 상태
-    rand logic [ 3:0] lane_data;  // 수신 노트 정보
-    rand logic        note_start;  // 노트 시작 펄스
+    rand logic [1:0] music_sel;
+    logic v_sync;
+    rand logic [3:0] region;  // 타격 신호 (사용자 입력)
+    rand logic [2:0] main_state;  // 메인 제어기 상태
+    rand logic [3:0] lane_data;  // 수신 노트 정보
+    rand logic note_start;  // 노트 시작 펄스
 
     // DUT -> Monitor
-    logic      [23:0] score;
-    logic             perfect;
-    logic             good;
-    logic             miss;
-    logic      [ 9:0] combo;
-    logic             fever;
+    logic [23:0] score;
+    logic perfect;
+    logic good;
+    logic miss;
+    logic [9:0] combo;
+    logic fever;
+
+    logic [3:0] pos[0:15];  // 각 슬롯의 레인
+    logic [9:0] lcnt[0:15];  // 각 슬롯의 Y좌표
 
     // 게임 상태 활성화 
     constraint c_game_state {main_state == 3'b011;}

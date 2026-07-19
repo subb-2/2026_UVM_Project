@@ -14,6 +14,8 @@ class rhythmGame_scoreboard extends uvm_scoreboard;
     // 스코어보드 내부에서 독자적으로 계산할 예상 점수/콤보 변수
     int expected_score = 0;
     int expected_combo = 0;
+    int pending_bonus = 0;
+
     int num_errors = 0;
     int num_perfect = 0;
     int num_good = 0;
@@ -30,6 +32,9 @@ class rhythmGame_scoreboard extends uvm_scoreboard;
     endfunction
 
     virtual function void write(rhythmGame_seq_item item);
+        expected_score += pending_bonus;  // ← 이 두 줄 추가
+        pending_bonus = 0;
+
         // 예상 점수 및 각 판정 별 카운팅 누적
         if (item.perfect) begin
             expected_score += (item.fever ? 200 : 100);
@@ -39,8 +44,15 @@ class rhythmGame_scoreboard extends uvm_scoreboard;
             expected_score += (item.fever ? 100 : 50);
             num_good++;  // Good 개수 누적
         end else if (item.miss) begin
+            // 끊긴 콤보로 보너스를 계산해서 메모만 해둠 (지금 더하지 않음)
+            if (expected_combo != 0) begin
+                int cr = expected_combo * (expected_combo + 1);
+                if (cr <= 101) pending_bonus = cr >> 1;
+                else if (cr <= 2550) pending_bonus = cr;
+                else pending_bonus = (cr * 3) >> 1;
+            end
             expected_combo = 0;
-            num_miss++;  // Miss 개수 누적
+            num_miss++;
         end
 
         // 스코어 및 콤보 검증

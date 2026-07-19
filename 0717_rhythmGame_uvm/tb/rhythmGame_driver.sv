@@ -63,6 +63,10 @@ class rhythmGame_driver extends uvm_driver #(rhythmGame_seq_item);
         vif.drv_cb.main_state <= req.main_state;
         `uvm_info(get_type_name(), $sformatf("drv rhythmGame 구동 완료: %s",
                                              req.convert2string()), UVM_MEDIUM)
+        // if (req.note_start || req.region != 4'b0000) begin
+        //     `uvm_info(get_type_name(),
+        //               $sformatf("drv: %s", req.convert2string()), UVM_MEDIUM)
+        // end
     endtask
 
 endclass  //component 
